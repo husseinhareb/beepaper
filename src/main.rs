@@ -3,12 +3,13 @@
 use anyhow::Result;
 use clap::Parser;
 
-use wallselect::cli::{Cli, Command};
-use wallselect::config::{init_config, load_config, resolve_paths};
-use wallselect::history;
-use wallselect::scanner::scan_directories;
-use wallselect::selector::select_random_thread_rng;
-use wallselect::state::AppState;
+use beepaper::cli::{Cli, Command};
+use beepaper::config::{init_config, load_config, resolve_paths};
+use beepaper::history;
+use beepaper::scanner::scan_directories;
+use beepaper::selector::select_random_thread_rng;
+use beepaper::state::AppState;
+use beepaper::wayland::{ApplyOptions, prepare_wallpaper};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -50,7 +51,7 @@ fn main() -> Result<()> {
                 println!("{}", file.display());
             }
         }
-        Command::Random(_) => {
+        Command::Random(args) => {
             let mut state = AppState::load_or_default(&paths.state_file)?;
             let should_rescan = overrides.affects_scan() || state.scanned_files.is_empty();
             let candidates = if should_rescan {
@@ -67,10 +68,32 @@ fn main() -> Result<()> {
                 config.random_no_repeat_window,
             )?;
 
-            println!("{}", selected.display());
-
-            state.record_selection(selected, config.history_size);
-            state.save(&paths.state_file)?;
+            if args.apply {
+                let running = prepare_wallpaper(
+                    &selected,
+                    &ApplyOptions {
+                        mode: config.apply_mode,
+                    },
+                )?;
+                println!("{}", selected.display());
+                state.record_selection(selected, config.history_size);
+                state.save(&paths.state_file)?;
+                running.run()?;
+            } else {
+                println!("{}", selected.display());
+                state.record_selection(selected, config.history_size);
+                state.save(&paths.state_file)?;
+            }
+        }
+        Command::Apply(args) => {
+            let running = prepare_wallpaper(
+                &args.path,
+                &ApplyOptions {
+                    mode: config.apply_mode,
+                },
+            )?;
+            println!("{}", args.path.display());
+            running.run()?;
         }
         Command::History(args) => {
             let state = AppState::load_or_default(&paths.state_file)?;

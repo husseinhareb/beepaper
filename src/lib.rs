@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Library modules for the `wallselect` CLI.
+//! Library modules for the `beepaper` CLI.
 
 /// Command-line argument parsing.
 pub mod cli;
@@ -15,3 +15,5 @@ pub mod scanner;
 pub mod selector;
 /// Persisted scan and selection state.
 pub mod state;
+/// Native Wayland wallpaper application.
+pub mod wayland;

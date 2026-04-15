@@ -6,12 +6,12 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::config::ConfigOverrides;
 
-/// The `wallselect` command-line interface.
+/// The `beepaper` command-line interface.
 #[derive(Debug, Parser)]
 #[command(
-    name = "wallselect",
+    name = "beepaper",
     version,
-    about = "Discover and select wallpapers from configured directories"
+    about = "Discover, select, and apply wallpapers natively on Wayland"
 )]
 pub struct Cli {
     /// Use a custom config file path.
@@ -27,13 +27,15 @@ pub struct Cli {
     pub command: Command,
 }
 
-/// Supported `wallselect` subcommands.
+/// Supported `beepaper` subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Scan configured wallpaper directories and cache the results.
     Scan(ScanArgs),
     /// Select a random wallpaper path from cached or freshly scanned files.
     Random(RandomArgs),
+    /// Apply a specific wallpaper path natively on Wayland.
+    Apply(ApplyArgs),
     /// Print recent wallpaper selections.
     History(HistoryArgs),
     /// Print the resolved configuration after defaults and overrides.
@@ -84,6 +86,10 @@ pub struct RandomArgs {
     /// Command-specific config overrides.
     #[command(flatten)]
     pub config: ConfigArgs,
+
+    /// Apply the selected wallpaper natively on Wayland.
+    #[arg(long)]
+    pub apply: bool,
 }
 
 /// Arguments for the `show-config` command.
@@ -100,6 +106,14 @@ pub struct HistoryArgs {
     /// Limit the number of history entries printed.
     #[arg(long)]
     pub limit: Option<usize>,
+}
+
+/// Arguments for the `apply` command.
+#[derive(Debug, Clone, Args)]
+pub struct ApplyArgs {
+    /// Image path to apply as a wallpaper.
+    #[arg(value_name = "PATH")]
+    pub path: PathBuf,
 }
 
 impl ConfigArgs {
@@ -130,7 +144,9 @@ impl Command {
             Command::Scan(args) => args.config.to_overrides(),
             Command::Random(args) => args.config.to_overrides(),
             Command::ShowConfig(args) => args.config.to_overrides(),
-            Command::History(_) | Command::InitConfig => ConfigOverrides::default(),
+            Command::Apply(_) | Command::History(_) | Command::InitConfig => {
+                ConfigOverrides::default()
+            }
         }
     }
 }

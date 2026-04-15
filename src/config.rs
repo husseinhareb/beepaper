@@ -12,6 +12,15 @@ use crate::error::ConfigError;
 const CONFIG_FILE_NAME: &str = "config.toml";
 const STATE_FILE_NAME: &str = "state.toml";
 
+/// How a wallpaper image should be scaled to the output.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApplyMode {
+    /// Scale to fill the output and crop excess area.
+    #[default]
+    Fill,
+}
+
 /// Fully resolved application configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -25,6 +34,8 @@ pub struct AppConfig {
     pub history_size: usize,
     /// Number of recent selections to avoid repeating when possible.
     pub random_no_repeat_window: usize,
+    /// How wallpapers should be scaled when applied on Wayland.
+    pub apply_mode: ApplyMode,
 }
 
 impl Default for AppConfig {
@@ -47,6 +58,7 @@ impl Default for AppConfig {
             ],
             history_size: 50,
             random_no_repeat_window: 5,
+            apply_mode: ApplyMode::Fill,
         }
     }
 }
@@ -59,6 +71,7 @@ struct RawConfig {
     extensions: Option<Vec<String>>,
     history_size: Option<usize>,
     random_no_repeat_window: Option<usize>,
+    apply_mode: Option<ApplyMode>,
 }
 
 /// CLI-driven config overrides.
@@ -109,6 +122,9 @@ impl RawConfig {
         if let Some(random_no_repeat_window) = self.random_no_repeat_window {
             config.random_no_repeat_window = random_no_repeat_window;
         }
+        if let Some(apply_mode) = self.apply_mode {
+            config.apply_mode = apply_mode;
+        }
 
         config
     }
@@ -144,7 +160,7 @@ impl ConfigOverrides {
 
 /// Resolve the default config and state file locations.
 pub fn resolve_paths(config_override: Option<&Path>) -> Result<AppPaths> {
-    let project_dirs = ProjectDirs::from("dev", "beepaper", "wallselect")
+    let project_dirs = ProjectDirs::from("dev", "beepaper", "beepaper")
         .ok_or(ConfigError::ProjectDirsUnavailable)?;
 
     let config_file = match config_override {
@@ -197,7 +213,7 @@ fn merge_config(raw: Option<RawConfig>, overrides: &ConfigOverrides) -> AppConfi
 
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, ConfigOverrides, RawConfig, merge_config};
+    use super::{AppConfig, ApplyMode, ConfigOverrides, RawConfig, merge_config};
     use std::path::PathBuf;
 
     #[test]
@@ -221,6 +237,7 @@ mod tests {
             merged.random_no_repeat_window,
             defaults.random_no_repeat_window
         );
+        assert_eq!(merged.apply_mode, defaults.apply_mode);
     }
 
     #[test]
@@ -245,5 +262,20 @@ mod tests {
         assert_eq!(merged.history_size, 3);
         assert_eq!(merged.random_no_repeat_window, 1);
         assert_eq!(merged.extensions, vec!["png"]);
+        assert_eq!(merged.apply_mode, ApplyMode::Fill);
+    }
+
+    #[test]
+    fn apply_mode_parses_from_config() {
+        let raw: RawConfig = toml::from_str(
+            r#"
+            apply_mode = "fill"
+            "#,
+        )
+        .expect("raw config should parse");
+
+        let merged = merge_config(Some(raw), &ConfigOverrides::default());
+
+        assert_eq!(merged.apply_mode, ApplyMode::Fill);
     }
 }
